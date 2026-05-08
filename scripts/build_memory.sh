@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -e
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+
+mkdir -p ./output
+mkdir -p ./output/memories
+mkdir -p ./output/prototypes
+mkdir -p ./output/runs
+mkdir -p ./output/logs
+
+python main.py \
+  --method build_memory \
+  --dataset openai/gsm8k \
+  --dataset_split test \
+  --memory_dataset openai/gsm8k \
+  --memory_split train \
+  --model_name_or_path Qwen/Qwen2.5-7B-Instruct \
+  --output_dir ./output \
+  --memory_dir ./output/memories \
+  --prototype_dir ./output/prototypes \
+  --memory_output_path ./output/memories/gsm8k_memory.jsonl \
+  --start_data_idx 0 \
+  --end_data_idx -1 \
+  --max_new_tokens 1024 \
+  --device cuda \
+  --dtype auto \
+  --solver_prompt_idx 0 \
+  --seed 42 \
+  --n_memory_samples 5 \
+  --memory_temperature 0.4 \
+  --memory_top_p 0.9 \
+  --min_memory_reliability 0.25 \
+  --verbose 1

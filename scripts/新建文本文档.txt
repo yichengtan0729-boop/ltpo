@@ -1,0 +1,12 @@
+git clone <你的仓库地址>
+cd LTPO_memory
+conda create -n sc-likelihood-ratios python=3.10 -y
+conda activate sc-likelihood-ratios
+pip install -r requirements.txt
+cd extract_judge_answer\latex2sympy
+pip install -e .
+cd ..\..
+pip install math-verify word2number
+小测试：powershell -ExecutionPolicy Bypass -File .\scripts\run_memory_pipeline_7b.ps1 -MemoryEnd 20 -EvalEnd 20
+完整跑：powershell -ExecutionPolicy Bypass -File .\scripts\run_memory_pipeline_7b.ps1
+Qwen7B不用下的命令：powershell -ExecutionPolicy Bypass -File .\scripts\run_memory_pipeline_7b.ps1 -SkipDownload

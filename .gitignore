@@ -1,0 +1,9 @@
+Qwen2.5-0.5B-Instruct.zip
+*.zip
+output/
+__pycache__/
+*.pyc
+*.pt
+*.jsonl
+*.pkl
+*.log
