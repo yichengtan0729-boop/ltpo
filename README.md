@@ -93,22 +93,16 @@ Bash:
 SKIP_DOWNLOAD=1 OUTPUT_DIR=./output bash scripts/run_step_memory_pipeline_7b.sh
 ```
 
-PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_step_memory_pipeline_7b.ps1 -SkipDownload -OutputDir .\output
-```
-
 Disable the V2 decoder:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_step_memory_pipeline_7b.ps1 -SkipDownload -DisableStepDecoder
+```bash
+SKIP_DOWNLOAD=1 DISABLE_STEP_DECODER=1 bash scripts/run_step_memory_pipeline_7b.sh
 ```
 
 Disable the failure penalty:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_step_memory_pipeline_7b.ps1 -SkipDownload -DisableFailurePenalty
+```bash
+SKIP_DOWNLOAD=1 DISABLE_FAILURE_PENALTY=1 bash scripts/run_step_memory_pipeline_7b.sh
 ```
 
 Outputs are written under:

@@ -90,11 +90,17 @@ class StepGroundedReward:
             return self._zero(thought_hidden_states)
 
         z = thought_hidden_states[:k]
-        outputs = self.step_decoder(z)
-        type_ids = self.step_type_ids[:k].to(device=z.device)
+        try:
+            decoder_dtype = next(self.step_decoder.parameters()).dtype
+        except StopIteration:
+            decoder_dtype = z.dtype
+        z_dec = z.to(dtype=decoder_dtype)
+
+        outputs = self.step_decoder(z_dec)
+        type_ids = self.step_type_ids[:k].to(device=z_dec.device)
         type_score = F.log_softmax(outputs["type_logits"], dim=-1).gather(1, type_ids[:, None]).mean()
 
-        target = self.target_step_embeds[:k].to(device=z.device, dtype=z.dtype)
+        target = self.target_step_embeds[:k].to(device=z_dec.device, dtype=decoder_dtype)
         if hasattr(self.step_decoder, "project_targets"):
             target_proj = self.step_decoder.project_targets(target)
         else:
@@ -106,7 +112,8 @@ class StepGroundedReward:
         else:
             step_proj = outputs["step_proj"]
         semantic_score = F.cosine_similarity(step_proj, target_proj, dim=-1).mean()
-        return type_score + semantic_score
+        decoder_validity = torch.nan_to_num(type_score + semantic_score)
+        return decoder_validity.to(dtype=thought_hidden_states.dtype)
 
     def _failure_penalty(self, thought_hidden_states: torch.Tensor) -> torch.Tensor:
         if self.disable_failure_penalty or self.failure_embeds is None or self.failure_embeds.numel() == 0:
