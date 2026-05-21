@@ -17,6 +17,10 @@ from memory_ltpo import generate_with_memory
 from memory_scorer import MemoryScorer
 from prototype_builder import build_prototypes
 from reward import RewardModel
+from step_grounded_ltpo import generate_step_grounded
+from step_memory_builder import build_step_memory_bank
+from step_prototype_builder import build_step_prototypes
+from train_step_decoder import train_step_decoder
 from utils_io import ensure_dir, safe_name_from_path
 
 
@@ -28,7 +32,17 @@ def parse_args():
 
     # common
     parser.add_argument("--method", type=str, default="ltpo",
-                        choices=["baseline", "ltpo", "memory_ltpo", "build_memory", "build_prototypes"])
+                        choices=[
+                            "baseline",
+                            "ltpo",
+                            "memory_ltpo",
+                            "build_memory",
+                            "build_prototypes",
+                            "build_step_memory",
+                            "build_step_prototypes",
+                            "train_step_decoder",
+                            "step_memory_ltpo",
+                        ])
     parser.add_argument("--dataset", type=str, default="openai/gsm8k", help="Dataset to evaluate")
     parser.add_argument("--dataset_split", type=str, default="test", help="Split for evaluation")
     parser.add_argument("--memory_dataset", type=str, default="", help="Dataset to build memory from")
@@ -74,6 +88,42 @@ def parse_args():
     parser.add_argument("--min_memory_reliability", type=float, default=0.25)
     parser.add_argument("--disable_ct", action="store_true")
     parser.add_argument("--disable_copy_penalty", action="store_true")
+
+    # step-grounded memory LTPO args
+    parser.add_argument("--step_memory_dir", type=str, default="./output/step_memories")
+    parser.add_argument("--step_prototype_dir", type=str, default="./output/step_prototypes")
+    parser.add_argument("--step_decoder_dir", type=str, default="./output/step_decoders")
+    parser.add_argument("--step_memory_output_path", type=str, default="")
+    parser.add_argument("--step_prototype_path", type=str, default="")
+    parser.add_argument("--step_vectorizer_path", type=str, default="")
+    parser.add_argument("--step_decoder_path", type=str, default="")
+    parser.add_argument("--n_step_prototypes_per_group", type=int, default=4)
+    parser.add_argument("--min_failure_reliability", type=float, default=0.25)
+    parser.add_argument("--num_step_roles", type=int, default=4)
+    parser.add_argument(
+        "--step_roles",
+        nargs="+",
+        default=["understand_extract", "plan_retrieve", "infer_compute", "verify_correct"],
+    )
+    parser.add_argument("--step_top_k_per_role", type=int, default=1)
+    parser.add_argument("--step_align_weight", type=float, default=0.4)
+    parser.add_argument("--step_conf_weight", type=float, default=0.4)
+    parser.add_argument("--step_collapse_weight", type=float, default=0.2)
+    parser.add_argument("--step_decoder_weight", type=float, default=0.2)
+    parser.add_argument("--step_failure_weight", type=float, default=0.2)
+    parser.add_argument("--collapse_margin", type=float, default=0.5)
+    parser.add_argument("--step_grounding_mix", type=float, default=0.5)
+    parser.add_argument("--disable_step_decoder", action="store_true")
+    parser.add_argument("--disable_failure_penalty", action="store_true")
+
+    # auxiliary step decoder training args
+    parser.add_argument("--step_decoder_epochs", type=int, default=1)
+    parser.add_argument("--step_decoder_batch_size", type=int, default=1)
+    parser.add_argument("--step_decoder_lr", type=float, default=1e-3)
+    parser.add_argument("--step_decoder_proj_dim", type=int, default=512)
+    parser.add_argument("--decoder_type_weight", type=float, default=1.0)
+    parser.add_argument("--decoder_sem_weight", type=float, default=0.5)
+    parser.add_argument("--decoder_ctr_weight", type=float, default=0.0)
 
     # misc
     parser.add_argument("--verbose", type=int, default=1)
@@ -181,6 +231,16 @@ def _build_output_dir(args) -> str:
             f"{model_name}-{data_name}-memoryltpo-topk{args.top_k_prototypes}-cand{args.n_candidates}",
         )
 
+    if args.method == "step_memory_ltpo":
+        return os.path.join(
+            args.output_dir,
+            (
+                f"{model_name}-{data_name}-stepmemoryltpo-"
+                f"tokens{args.num_thought_tokens}-steps{args.max_num_steps}-"
+                f"align{args.step_align_weight}-dec{args.step_decoder_weight}-fail{args.step_failure_weight}"
+            ),
+        )
+
     return args.output_dir
 
 
@@ -229,6 +289,34 @@ def run_build_prototypes(args):
     print(f'[build_prototypes] vectorizer_path={result.get("vectorizer_path", "")}')
 
 
+def run_build_step_memory(args):
+    model, tokenizer = _load_model_and_tokenizer(args)
+
+    dataset_name = args.memory_dataset if args.memory_dataset else args.dataset
+    split_name = args.memory_split if args.memory_split else "train"
+
+    dataset = get_dataset(
+        dataset_name,
+        tokenizer=tokenizer,
+        prompt_idx=args.solver_prompt_idx,
+        split=split_name,
+    )
+    path = build_step_memory_bank(args, model, tokenizer, dataset)
+    print(f"[build_step_memory] saved to: {path}")
+
+
+def run_build_step_prototypes(args):
+    result = build_step_prototypes(args)
+    print(f'[build_step_prototypes] prototype_path={result.get("prototype_path", "")}')
+    print(f'[build_step_prototypes] vectorizer_path={result.get("vectorizer_path", "")}')
+
+
+def run_train_step_decoder(args):
+    model, tokenizer = _load_model_and_tokenizer(args)
+    path = train_step_decoder(args, model, tokenizer)
+    print(f"[train_step_decoder] saved to: {path}")
+
+
 def main(args):
     if args.seed is not None:
         set_seed(args.seed)
@@ -239,6 +327,18 @@ def main(args):
 
     if args.method == "build_prototypes":
         run_build_prototypes(args)
+        return
+
+    if args.method == "build_step_memory":
+        run_build_step_memory(args)
+        return
+
+    if args.method == "build_step_prototypes":
+        run_build_step_prototypes(args)
+        return
+
+    if args.method == "train_step_decoder":
+        run_train_step_decoder(args)
         return
 
     model, tokenizer = _load_model_and_tokenizer(args)
@@ -358,6 +458,66 @@ def main(args):
                 "retrieved_prototypes": retrieved_prototypes,
                 "candidate_responses": candidates,
                 "score_breakdown": score_breakdown,
+            }
+
+        elif args.method == "step_memory_ltpo":
+            model_name = safe_name_from_path(args.model_name_or_path)
+            data_name = safe_name_from_path(args.dataset)
+            if not args.step_prototype_path:
+                args.step_prototype_path = os.path.join(
+                    args.step_prototype_dir,
+                    f"{model_name}-{data_name}-step-prototypes.json",
+                )
+            if not args.step_vectorizer_path:
+                args.step_vectorizer_path = os.path.splitext(args.step_prototype_path)[0] + ".step.vectorizer.pkl"
+            if not args.step_decoder_path:
+                args.step_decoder_path = os.path.join(
+                    args.step_decoder_dir,
+                    f"{model_name}-{data_name}-step-decoder.pt",
+                )
+
+            (
+                output,
+                best_reward,
+                best_reward_step,
+                retrieved_step_prototypes,
+                reward_trace,
+                diagnostics,
+            ) = generate_step_grounded(
+                tokenizer=tokenizer,
+                model=model,
+                question=question,
+                data_name=args.dataset,
+                model_name=args.model_name_or_path,
+                step_prototype_path=args.step_prototype_path,
+                step_vectorizer_path=args.step_vectorizer_path,
+                step_decoder_path=args.step_decoder_path,
+                num_thought_tokens=args.num_thought_tokens,
+                max_rl_steps=args.max_num_steps,
+                max_new_tokens=args.max_new_tokens,
+                lr=args.lr,
+                sigma=args.sigma,
+                sigma_decay=args.sigma_decay,
+                top_k=args.top_k,
+                step_roles=args.step_roles[:args.num_step_roles],
+                step_top_k_per_role=args.step_top_k_per_role,
+                step_conf_weight=args.step_conf_weight,
+                step_align_weight=args.step_align_weight,
+                step_collapse_weight=args.step_collapse_weight,
+                step_decoder_weight=args.step_decoder_weight,
+                step_failure_weight=args.step_failure_weight,
+                collapse_margin=args.collapse_margin,
+                step_grounding_mix=args.step_grounding_mix,
+                reward_threshold=args.reward_threshold,
+                disable_step_decoder=args.disable_step_decoder,
+                disable_failure_penalty=args.disable_failure_penalty,
+                verbose=args.verbose,
+            )
+
+            extra = {
+                "retrieved_step_prototypes": retrieved_step_prototypes,
+                "reward_trace": reward_trace,
+                "diagnostics": diagnostics,
             }
 
         else:

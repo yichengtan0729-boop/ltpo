@@ -62,6 +62,62 @@ bash scripts/run_memory_pipeline_7b.sh
 
 By default these scripts use `Qwen/Qwen2.5-7B-Instruct`, download it into `./artifacts/models/Qwen2.5-7B-Instruct` if missing, run with the `sc-likelihood-ratios` conda environment, and write memory/prototype/eval outputs under `./output`. Use `-OutputDir` in PowerShell or `OUTPUT_DIR=...` in Bash to redirect test runs. Use `-SkipDownload` in PowerShell or `SKIP_DOWNLOAD=1` in Bash when the model is already available or when you want Transformers to use its normal cache.
 
+### Run Step-Grounded Memory LTPO
+
+This is a new method path and does not replace the existing `memory_ltpo` pipeline.
+
+V1, Step-Grounded LTPO Lite, uses:
+
+- confidence
+- step alignment
+- collapse penalty
+
+V2, Verifiable Step-Grounded LTPO, adds:
+
+- auxiliary step decoder
+- failure memory
+- decoder validity reward
+- failure penalty
+- diagnostic latent CoT information
+
+The four pipeline stages are:
+
+1. `build_step_memory`
+2. `build_step_prototypes`
+3. `train_step_decoder`
+4. `step_memory_ltpo`
+
+Bash:
+
+```bash
+SKIP_DOWNLOAD=1 OUTPUT_DIR=./output bash scripts/run_step_memory_pipeline_7b.sh
+```
+
+PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_step_memory_pipeline_7b.ps1 -SkipDownload -OutputDir .\output
+```
+
+Disable the V2 decoder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_step_memory_pipeline_7b.ps1 -SkipDownload -DisableStepDecoder
+```
+
+Disable the failure penalty:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_step_memory_pipeline_7b.ps1 -SkipDownload -DisableFailurePenalty
+```
+
+Outputs are written under:
+
+- step memory: `output/step_memories/`
+- step prototypes: `output/step_prototypes/`
+- step decoder: `output/step_decoders/`
+- eval logs: `output/*stepmemoryltpo*/`
+
 ### Evaluate Zero-Shot CoT Baseline
 
 Following command will evaluate Zero-Shot CoT baseline against all five reasoning benchmarks.
