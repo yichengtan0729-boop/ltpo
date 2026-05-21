@@ -93,12 +93,12 @@ def set_seed(seed: int):
 
 
 DEFAULT_SCORE_WEIGHTS: Dict[str, float] = {
-    "answer_consistency": 0.45,
-    "memory_support": 0.30,
-    "validity": 0.20,
-    "prototype_coverage": 0.05,
+    "answer_consistency": 0.55,
+    "memory_support": 0.20,
+    "validity": 0.25,
+    "prototype_coverage": 0.00,
     "confidence": 0.00,
-    "copy_penalty": 0.10,
+    "copy_penalty": 0.02,
     "collapse_penalty": 0.00,
     "ct_cost": 0.00,
 }

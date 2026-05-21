@@ -1,0 +1,58 @@
+python - <<'PY'
+import json
+src = './output/memories/Qwen2.5-7B-Instruct-openai_gsm8k-memory.jsonl'
+dst = './output/memories/Qwen2.5-7B-Instruct-openai_gsm8k-memory-r089.jsonl'
+keep = 0
+with open(src, 'r', encoding='utf-8') as fin, open(dst, 'w', encoding='utf-8') as fout:
+    for line in fin:
+        line = line.strip()
+        if not line:
+            continue
+        obj = json.loads(line)
+        if float(obj.get('reliability', 0.0)) >= 0.89:
+            fout.write(json.dumps(obj, ensure_ascii=False) + '\n')
+            keep += 1
+print('kept:', keep)
+print('saved to:', dst)
+PY
+
+
+
+python main.py \
+  --method build_prototypes \
+  --dataset openai/gsm8k \
+  --model_name_or_path Qwen/Qwen2.5-7B-Instruct \
+  --output_dir ./output \
+  --memory_dir ./output/memories \
+  --prototype_dir ./output/prototypes \
+  --memory_output_path ./output/memories/Qwen2.5-7B-Instruct-openai_gsm8k-memory-r089.jsonl \
+  --prototype_path ./output/prototypes/Qwen2.5-7B-Instruct-openai_gsm8k-prototypes-r089-p16.json \
+  --n_prototypes 16 \
+  --top_examples_per_prototype 3 \
+  --prototype_max_features 4096 \
+  --seed 42 \
+  --verbose 1
+
+
+python main.py \
+  --method memory_ltpo \
+  --dataset openai/gsm8k \
+  --dataset_split test \
+  --model_name_or_path Qwen/Qwen2.5-7B-Instruct \
+  --output_dir ./output \
+  --memory_dir ./output/memories \
+  --prototype_dir ./output/prototypes \
+  --prototype_path ./output/prototypes/Qwen2.5-7B-Instruct-openai_gsm8k-prototypes-r089-p16.json \
+  --start_data_idx 0 \
+  --end_data_idx -1 \
+  --max_new_tokens 1024 \
+  --device cuda:2 \
+  --dtype auto \
+  --solver_prompt_idx 0 \
+  --seed 42 \
+  --top_k_prototypes 2 \
+  --n_candidates 2 \
+  --memory_temperature 0.4 \
+  --memory_top_p 0.9 \
+  --disable_ct \
+  --verbose 1

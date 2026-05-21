@@ -19,6 +19,8 @@ DEFAULT_BREAKDOWN_KEYS = (
     "ct_cost",
 )
 
+GROUP_SIZE_BONUS = 0.02
+
 
 def _get_model_device(model) -> torch.device:
     try:
@@ -129,6 +131,60 @@ def _rotate_prototypes(prototypes: List[Dict[str, Any]], offset: int) -> List[Di
 def _normalize_breakdown(breakdown: Optional[Dict[str, Any]]) -> Dict[str, float]:
     breakdown = breakdown if isinstance(breakdown, dict) else {}
     return {key: _safe_float(breakdown.get(key, 0.0)) for key in DEFAULT_BREAKDOWN_KEYS}
+
+
+def _answer_group_key(candidate: Dict[str, Any]) -> str:
+    answer = candidate.get("answer", None)
+    if answer is not None and str(answer).strip():
+        return str(answer).strip()
+    return f"__no_answer_candidate_{candidate.get('candidate_idx', len(str(candidate)))}"
+
+
+def _select_best_candidate_by_answer_group(candidates: List[Dict[str, Any]]) -> Dict[str, Any]:
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    for candidate in candidates:
+        groups.setdefault(_answer_group_key(candidate), []).append(candidate)
+
+    group_records = []
+    for group_key, members in groups.items():
+        scores = [_safe_float(member.get("score", 0.0)) for member in members]
+        best_member = max(
+            members,
+            key=lambda x: (
+                _safe_float(x.get("score", 0.0)),
+                -int(x.get("candidate_idx", 10**9)),
+            ),
+        )
+        best_member_score = _safe_float(best_member.get("score", 0.0))
+
+        # 改成“组内最高分 + 小的组大小奖励”
+        group_score = best_member_score + GROUP_SIZE_BONUS * (len(members) - 1)
+
+        group_records.append(
+            {
+                "group_key": group_key,
+                "members": members,
+                "score": float(group_score),
+                "best_member_score": float(best_member_score),
+                "best_candidate_idx": int(best_member.get("candidate_idx", 10**9)),
+            }
+        )
+
+    best_group = max(
+        group_records,
+        key=lambda x: (
+            x["score"],
+            x["best_member_score"],
+            -x["best_candidate_idx"],
+        ),
+    )
+    return max(
+        best_group["members"],
+        key=lambda x: (
+            _safe_float(x.get("score", 0.0)),
+            -int(x.get("candidate_idx", 10**9)),
+        ),
+    )
 
 
 def _build_generation_kwargs(
@@ -259,8 +315,8 @@ def generate_with_memory(
     if not candidates:
         raise RuntimeError("No candidates generated in memory_ltpo.")
 
-    # 4) select best candidate
-    best = max(candidates, key=lambda x: x["score"])
+    # 4) select best answer group, then best candidate inside that group
+    best = _select_best_candidate_by_answer_group(candidates)
 
     return (
         best["response"],

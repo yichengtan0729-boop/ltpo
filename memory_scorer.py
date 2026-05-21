@@ -5,12 +5,12 @@ from utils_parse import safe_parse_answer
 
 
 DEFAULT_WEIGHTS: Dict[str, float] = {
-    "answer_consistency": 0.45,
-    "memory_support": 0.30,
-    "validity": 0.20,
-    "prototype_coverage": 0.05,
+    "answer_consistency": 0.55,
+    "memory_support": 0.20,
+    "validity": 0.25,
+    "prototype_coverage": 0.00,
     "confidence": 0.00,
-    "copy_penalty": 0.10,
+    "copy_penalty": 0.02,
     "collapse_penalty": 0.00,
     "ct_cost": 0.00,
 }
@@ -171,7 +171,7 @@ class MemoryScorer:
         如果没有，就不要直接退化成 validity=1.0，而是给一个中性值。
         """
         if not auxiliary_samples:
-            return 0.5 if answer is not None else 0.0
+            return 0.5 if answer is not None and str(answer).strip() else 0.0
 
         aux_answers = [safe_parse_answer(x) for x in auxiliary_samples]
         matches = sum(a == answer and a is not None for a in aux_answers)
