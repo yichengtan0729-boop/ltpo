@@ -1,0 +1,24 @@
+name: FLOC-Rad tests
+
+on:
+  push:
+    paths:
+      - 'floc_rad/**'
+      - '.github/workflows/floc-rad-tests.yml'
+  pull_request:
+    paths:
+      - 'floc_rad/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: floc_rad
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
